@@ -6,7 +6,6 @@ import psycopg2
 from dotenv import load_dotenv
 from error_handling import connect_to_database, retry, log_error  # Importing from error_handling
 
-
 # Load environment variables from .env file
 load_dotenv()
 
@@ -43,6 +42,7 @@ def connect_to_database():
     conn.autocommit = True
     return conn
 
+@retry  # Applying retry decorator for database insertion
 def save_metrics_to_db(data, conn):
     """Save calculated metrics to the PostgreSQL database."""
     try:
@@ -61,8 +61,8 @@ def save_metrics_to_db(data, conn):
                 data['lowest_ask'],
                 data['max_spread']
             ))
-            conn.commit()  # Commit to save the data in the database
-            print(f"Metrics saved to database for pair {data['pair']}.")
+            conn.commit()
+            logging.info(f"Metrics saved to database for pair {data['pair']}.")
     except Exception as e:
         log_error(f"Error saving metrics to database: {e}")
 
@@ -97,7 +97,7 @@ def calculate_metrics(data, conn):
 
 def consume_data():
     """Consume data from Kafka, calculate metrics, and store in DB."""
-    print("Starting the consumer and calculations...")
+    logging.info("Starting the consumer and calculations...")
 
     # Connect to the database with retry logic
     try:
@@ -114,24 +114,24 @@ def consume_data():
                 continue
             if message.error():
                 if message.error().code() == KafkaError._PARTITION_EOF:
-                    print(f"End of partition reached {message.topic()} [{message.partition()}] at offset {message.offset()}")
+                    logging.info(f"End of partition reached at offset {message.offset()}")
                 else:
-                    log_error(f"Error: {message.error()}")
+                    log_error(f"Kafka error: {message.error()}")
                 continue
 
-            # Process and calculate metrics
             data = json.loads(message.value().decode('utf-8'))
+            logging.info(f"Received message: {data}")
             calculate_metrics(data, conn)
         
         except Exception as e:
             log_error(f"Error during data consumption: {e}")
 
-    conn.close()  # Close the connection to the database
+    conn.close()
 
 if __name__ == '__main__':
     try:
         consume_data()
     except KeyboardInterrupt:
-        print("Consumer interrupted.")
+        logging.info("Consumer interrupted.")
     finally:
         consumer.close()

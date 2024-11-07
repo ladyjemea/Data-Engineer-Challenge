@@ -33,7 +33,7 @@ def send_data_to_kafka(data):
     try:
         for record in data:
             producer.produce(KAFKA_TOPIC, json.dumps(record).encode('utf-8'))
-            print(f"Sent to Kafka: {record}")
+            logging.info(f"Sent to Kafka: {record}")
         producer.flush()
     except Exception as e:
         logging.error(f"Error sending data to Kafka: {e}")
