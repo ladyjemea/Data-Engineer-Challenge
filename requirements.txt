@@ -2,4 +2,4 @@ confluent-kafka
 pandas
 psycopg2
 python-dotenv
-unittest
+apache-beam

@@ -1,0 +1,10 @@
+2024-11-08 00:02:22,660 - INFO - Starting data processing...
+2024-11-08 00:02:22,661 - INFO - Missing pipeline option (runner). Executing pipeline using the default runner: DirectRunner.
+2024-11-08 00:02:22,776 - INFO - Creating state cache with size 104857600
+2024-11-08 00:02:22,800 - INFO - Processed: ('key1', ['value1', 'value3'])
+2024-11-08 00:02:22,801 - INFO - Processed: ('key2', ['value2', 'value4'])
+2024-11-08 00:03:08,356 - INFO - Starting data processing...
+2024-11-08 00:03:08,357 - INFO - Missing pipeline option (runner). Executing pipeline using the default runner: DirectRunner.
+2024-11-08 00:03:08,423 - INFO - Creating state cache with size 104857600
+2024-11-08 00:03:08,448 - INFO - Processed: ('key1', ['value1', 'value3'])
+2024-11-08 00:03:08,448 - INFO - Processed: ('key2', ['value2', 'value4'])

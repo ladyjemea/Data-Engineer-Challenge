@@ -9,6 +9,9 @@ from error_handling import connect_to_database, retry, log_error  # Importing fr
 # Load environment variables from .env file
 load_dotenv()
 
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', force=True)
+
+
 # Database configuration
 DB_CONFIG = {
     'dbname': os.getenv('DB_NAME'),
@@ -23,7 +26,8 @@ KAFKA_BOOTSTRAP_SERVERS = 'localhost:9092'
 
 # Initialize Kafka Consumer
 consumer = Consumer({
-    'bootstrap.servers': KAFKA_BOOTSTRAP_SERVERS,
+    #'bootstrap.servers': KAFKA_BOOTSTRAP_SERVERS,
+    'bootstrap.servers': 'localhost:9092',
     'group.id': 'crypto_price_consumer_group',
     'auto.offset.reset': 'earliest'
 })
@@ -105,6 +109,7 @@ def consume_data():
     except Exception as e:
         log_error(f"Database connection failed: {e}")
         exit(1)  # Exit if the database connection fails
+    
 
     while True:
         try:

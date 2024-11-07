@@ -8,8 +8,16 @@ import logging
 KAFKA_TOPIC = 'crypto_prices'
 KAFKA_BOOTSTRAP_SERVERS = 'localhost:9092'
 
+# Configure logging to print to the console
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 # Initialize Kafka Producer
-producer = Producer({'bootstrap.servers': KAFKA_BOOTSTRAP_SERVERS})
+try:
+    producer = Producer({'bootstrap.servers': KAFKA_BOOTSTRAP_SERVERS})
+    logging.info("Kafka Producer initialized successfully.")
+except Exception as e:
+    logging.error(f"Failed to initialize Kafka Producer: {e}")
+    raise e
 
 # Simulated data for demonstration purposes
 CURRENCY_PAIRS = ['BTC-USD', 'ETH-USD', 'LTC-USD']
@@ -26,6 +34,7 @@ def fetch_data():
             "ask": ask_price,
             "timestamp": time.time()
         })
+    logging.info(f"Fetched data: {data}")  # Added logging
     return data
 
 def send_data_to_kafka(data):
@@ -46,4 +55,10 @@ def main():
         time.sleep(5)
 
 if __name__ == '__main__':
-    main()
+    try:
+        logging.info("Starting data ingestion...")
+        main()
+    except KeyboardInterrupt:
+        logging.info("Data ingestion stopped by user.")
+    except Exception as e:
+        logging.error(f"Unexpected error: {e}")
