@@ -1,11 +1,11 @@
 from confluent_kafka import Consumer, KafkaError
 import json
-import psycopg2
-from psycopg2 import sql
 import logging
 import os
-import time
+import psycopg2
 from dotenv import load_dotenv
+from error_handling import connect_to_database, retry, log_error  # Importing from error_handling
+
 
 # Load environment variables from .env file
 load_dotenv()
@@ -36,19 +36,12 @@ highest_bid = 0
 lowest_ask = float('inf')
 max_spread = 0
 
-def connect_to_db():
-    """Establish a connection to the PostgreSQL database with retry logic."""
-    retries = 5
-    while retries > 0:
-        try:
-            conn = psycopg2.connect(**DB_CONFIG)
-            conn.autocommit = True
-            return conn
-        except psycopg2.OperationalError as e:
-            logging.error(f"Database connection error: {e}. Retrying...")
-            retries -= 1
-            time.sleep(2)
-    raise Exception("Failed to connect to the database after retries.")
+@retry  # Applying retry decorator for database connection
+def connect_to_database():
+    """Establish a connection to the PostgreSQL database with retries."""
+    conn = psycopg2.connect(**DB_CONFIG)
+    conn.autocommit = True
+    return conn
 
 def save_metrics_to_db(data, conn):
     """Save calculated metrics to the PostgreSQL database."""
@@ -71,7 +64,7 @@ def save_metrics_to_db(data, conn):
             conn.commit()  # Commit to save the data in the database
             print(f"Metrics saved to database for pair {data['pair']}.")
     except Exception as e:
-        logging.error(f"Error saving metrics to database: {e}")
+        log_error(f"Error saving metrics to database: {e}")
 
 def calculate_metrics(data, conn):
     """Calculate highest bid, lowest ask, max spread, and mid-price, and save to DB."""
@@ -105,7 +98,13 @@ def calculate_metrics(data, conn):
 def consume_data():
     """Consume data from Kafka, calculate metrics, and store in DB."""
     print("Starting the consumer and calculations...")
-    conn = connect_to_db()  # Connect to the database
+
+    # Connect to the database with retry logic
+    try:
+        conn = connect_to_database()
+    except Exception as e:
+        log_error(f"Database connection failed: {e}")
+        exit(1)  # Exit if the database connection fails
 
     while True:
         try:
@@ -117,7 +116,7 @@ def consume_data():
                 if message.error().code() == KafkaError._PARTITION_EOF:
                     print(f"End of partition reached {message.topic()} [{message.partition()}] at offset {message.offset()}")
                 else:
-                    logging.error(f"Error: {message.error()}")
+                    log_error(f"Error: {message.error()}")
                 continue
 
             # Process and calculate metrics
@@ -125,7 +124,7 @@ def consume_data():
             calculate_metrics(data, conn)
         
         except Exception as e:
-            logging.error(f"Error during data consumption: {e}")
+            log_error(f"Error during data consumption: {e}")
 
     conn.close()  # Close the connection to the database
 
