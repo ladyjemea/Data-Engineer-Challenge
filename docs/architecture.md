@@ -33,8 +33,9 @@ This architecture ingests, processes, and visualizes real-time cryptocurrency ma
      - A centralized log file, `pipeline.log`, captures all events, including data ingestion, processing, database interactions, and errors.
      - Logs provide detailed information on data flow, performance, and any issues encountered.
    - **Error Handling**:
-     - Built-in retry mechanisms for Kafka and database interactions.
-     - Logs errors, latency, throughput, and system health.
+     - Critical sections of the code, such as data ingestion and database operations, use `try-except` blocks with logging to capture and report errors without interrupting the entire application.
+   - Retries are implemented in functions such as `save_metrics_to_db` to    handle transient errors gracefully.
+     - The logging system helps monitor application health and troubleshoot issues by providing insight into data flows and system failures.
    - **Purpose**: Ensures system reliability by tracking performance, logging errors, and providing insights for troubleshooting.
    - **Justification**: Centralized logging and error handling improve visibility into the pipeline’s health, making it easier to detect and resolve issues.
 
