@@ -4,8 +4,7 @@ import logging
 import os
 import psycopg2
 from dotenv import load_dotenv
-from collections import deque
-from src.error_handling import connect_to_database, retry, log_error
+from src.error_handling import connect_to_database, retry, log_error  # Importing from error_handling
 
 # Load environment variables from .env file
 load_dotenv()
@@ -37,16 +36,24 @@ consumer.subscribe([KAFKA_TOPIC])
 highest_bid = 0
 lowest_ask = float('inf')
 max_spread = 0
-mid_price_history = deque(maxlen=5)  # For moving average
+mid_prices = []  # List to store recent mid-prices for moving average
+MOVING_AVERAGE_WINDOW = 5  # Number of mid-prices to keep for the moving average
 
-@retry
+@retry  # Applying retry decorator for database connection
+def connect_to_database():
+    """Establish a connection to the PostgreSQL database with retries."""
+    conn = psycopg2.connect(**DB_CONFIG)
+    conn.autocommit = True
+    return conn
+
+@retry  # Applying retry decorator for database insertion
 def save_metrics_to_db(data, conn):
     """Save calculated metrics to the PostgreSQL database."""
     try:
         with conn.cursor() as cur:
             query = """
-                INSERT INTO crypto_metrics (pair, bid, ask, mid_price, spread, highest_bid, lowest_ask, max_spread)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO crypto_metrics (pair, bid, ask, mid_price, spread, highest_bid, lowest_ask, max_spread, moving_avg)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             cur.execute(query, (
                 data['pair'],
@@ -56,15 +63,23 @@ def save_metrics_to_db(data, conn):
                 data['spread'],
                 data['highest_bid'],
                 data['lowest_ask'],
-                data['max_spread']
+                data['max_spread'],
+                data['moving_avg']  # Insert moving average
             ))
             conn.commit()
             logging.info(f"Metrics saved to database for pair {data['pair']}.")
     except Exception as e:
         log_error(f"Error saving metrics to database: {e}")
 
+def calculate_moving_average(mid_price):
+    """Calculate the moving average for the mid-price over a fixed window."""
+    mid_prices.append(mid_price)
+    if len(mid_prices) > MOVING_AVERAGE_WINDOW:
+        mid_prices.pop(0)  # Remove oldest mid-price to maintain window size
+    return sum(mid_prices) / len(mid_prices)  # Return the moving average
+
 def calculate_metrics(data, conn):
-    """Calculate metrics, including a moving average of the mid-price, and save to DB."""
+    """Calculate highest bid, lowest ask, max spread, mid-price, and moving average, then save to DB."""
     global highest_bid, lowest_ask, max_spread
 
     bid = data['bid']
@@ -77,10 +92,10 @@ def calculate_metrics(data, conn):
     lowest_ask = min(lowest_ask, ask)
     max_spread = max(max_spread, spread)
 
-    # Update mid_price moving average
-    mid_price_history.append(mid_price)
-    moving_avg_mid_price = sum(mid_price_history) / len(mid_price_history)
+    # Calculate moving average of mid-price
+    moving_avg = calculate_moving_average(mid_price)
 
+    # Prepare data to be saved
     data_to_save = {
         'pair': data['pair'],
         'bid': bid,
@@ -89,9 +104,11 @@ def calculate_metrics(data, conn):
         'spread': spread,
         'highest_bid': highest_bid,
         'lowest_ask': lowest_ask,
-        'max_spread': max_spread
+        'max_spread': max_spread,
+        'moving_avg': moving_avg  # Include moving average in the data
     }
 
+    # Save metrics to database
     save_metrics_to_db(data_to_save, conn)
 
 def consume_data():
@@ -100,7 +117,7 @@ def consume_data():
 
     # Connect to the database with retry logic
     try:
-        conn = connect_to_database(DB_CONFIG)
+        conn = connect_to_database()
     except Exception as e:
         log_error(f"Database connection failed: {e}")
         exit(1)  # Exit if the database connection fails
