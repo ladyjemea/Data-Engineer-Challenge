@@ -19,7 +19,7 @@ except Exception as e:
     logging.error(f"Failed to initialize Kafka Producer: {e}")
     raise e
 
-# Simulated data for demonstration purposes
+# Simulated data
 CURRENCY_PAIRS = ['BTC-USD', 'ETH-USD', 'LTC-USD']
 
 def fetch_data():
@@ -34,7 +34,7 @@ def fetch_data():
             "ask": ask_price,
             "timestamp": time.time()
         })
-    logging.info(f"Fetched data: {data}")  # Added logging
+    logging.info(f"Fetched data: {data}")
     return data
 
 def send_data_to_kafka(data):

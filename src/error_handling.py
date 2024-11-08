@@ -3,7 +3,7 @@ import time
 import psycopg2
 from confluent_kafka import KafkaException
 
-# Configure logging for the application
+# Configure logging
 logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(levelname)s - %(message)s', force=True)
 
 def retry(func, retries=5, delay=2):

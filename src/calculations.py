@@ -34,8 +34,8 @@ consumer.subscribe([KAFKA_TOPIC])
 highest_bid = 0
 lowest_ask = float('inf')
 max_spread = 0
-window_size = 5  # Moving average window size
-mid_prices = []  # List to store recent mid prices
+window_size = 5  
+mid_prices = [] 
 
 @retry
 def save_metrics_to_db(data, conn):
