@@ -6,6 +6,7 @@ import psycopg2
 from dotenv import load_dotenv
 from src.error_handling import connect_to_database, retry, log_error
 
+# Load environment variables from .env file
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', force=True)
@@ -35,19 +36,12 @@ consumer.subscribe([KAFKA_TOPIC])
 highest_bid = 0
 lowest_ask = float('inf')
 max_spread = 0
-window_size = 5  # Define the window size for the moving average
-mid_prices = []  # List to store recent mid prices for moving average calculation
+window_size = 5  # Moving average window size
+mid_prices = []  # List to store recent mid prices
 
-@retry  # Applying retry decorator for database connection
-def connect_to_database():
-    """Establish a connection to the PostgreSQL database with retries."""
-    conn = psycopg2.connect(**DB_CONFIG)
-    conn.autocommit = True
-    return conn
-
-@retry  # Applying retry decorator for database insertion
+@retry
 def save_metrics_to_db(data, conn):
-    """Save calculated metrics to the PostgreSQL database."""
+    """Save calculated metrics to the PostgreSQL database with retries."""
     try:
         with conn.cursor() as cur:
             query = """
@@ -71,29 +65,36 @@ def save_metrics_to_db(data, conn):
         log_error(f"Error saving metrics to database: {e}")
 
 def calculate_metrics(data, conn):
-    """Calculate highest bid, lowest ask, max spread, mid-price, and moving average, and save to DB."""
+    """Calculate metrics and save them to the database, handling malformed data."""
     global highest_bid, lowest_ask, max_spread, mid_prices
 
-    bid = data['bid']
-    ask = data['ask']
+    # Validate and handle malformed data
+    try:
+        bid = float(data['bid'])
+        ask = float(data['ask'])
+        pair = data['pair']
+    except (ValueError, KeyError) as e:
+        log_error(f"Malformed data: {data}. Error: {e}")
+        return
+
     mid_price = (bid + ask) / 2
     spread = ask - bid
 
-    # Update metrics
+    # Update cumulative metrics
     highest_bid = max(highest_bid, bid)
     lowest_ask = min(lowest_ask, ask)
     max_spread = max(max_spread, spread)
 
-    # Update mid_prices list and calculate moving average
+    # Update moving average
     mid_prices.append(mid_price)
     if len(mid_prices) > window_size:
-        mid_prices.pop(0)  # Keep only the last 'window_size' elements
+        mid_prices.pop(0)
 
     moving_avg = sum(mid_prices) / len(mid_prices) if mid_prices else 0
 
-    # Prepare data to be saved
+    # Data to save
     data_to_save = {
-        'pair': data['pair'],
+        'pair': pair,
         'bid': bid,
         'ask': ask,
         'mid_price': mid_price,
@@ -104,23 +105,22 @@ def calculate_metrics(data, conn):
         'moving_avg': moving_avg
     }
 
-    # Save metrics to database
     save_metrics_to_db(data_to_save, conn)
 
 def consume_data():
-    """Consume data from Kafka, calculate metrics, and store in DB."""
+    """Consume data from Kafka, calculate metrics, and store in DB with error handling."""
     logging.info("Starting the consumer and calculations...")
 
     # Connect to the database with retry logic
     try:
-        conn = connect_to_database()
+        conn = connect_to_database(DB_CONFIG)
     except Exception as e:
         log_error(f"Database connection failed: {e}")
-        exit(1)  # Exit if the database connection fails
+        exit(1)
 
     while True:
         try:
-            message = consumer.poll(1.0)  # Poll every 1 second
+            message = consumer.poll(1.0)
 
             if message is None:
                 continue
@@ -134,7 +134,7 @@ def consume_data():
             data = json.loads(message.value().decode('utf-8'))
             logging.info(f"Received message: {data}")
             calculate_metrics(data, conn)
-        
+
         except Exception as e:
             log_error(f"Error during data consumption: {e}")
 
