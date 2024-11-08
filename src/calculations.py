@@ -4,9 +4,8 @@ import logging
 import os
 import psycopg2
 from dotenv import load_dotenv
-from src.error_handling import connect_to_database, retry, log_error  # Importing from error_handling
+from src.error_handling import connect_to_database, retry, log_error
 
-# Load environment variables from .env file
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', force=True)
@@ -36,8 +35,8 @@ consumer.subscribe([KAFKA_TOPIC])
 highest_bid = 0
 lowest_ask = float('inf')
 max_spread = 0
-mid_prices = []  # List to store recent mid-prices for moving average
-MOVING_AVERAGE_WINDOW = 5  # Number of mid-prices to keep for the moving average
+window_size = 5  # Define the window size for the moving average
+mid_prices = []  # List to store recent mid prices for moving average calculation
 
 @retry  # Applying retry decorator for database connection
 def connect_to_database():
@@ -64,23 +63,16 @@ def save_metrics_to_db(data, conn):
                 data['highest_bid'],
                 data['lowest_ask'],
                 data['max_spread'],
-                data['moving_avg']  # Insert moving average
+                data['moving_avg']
             ))
             conn.commit()
             logging.info(f"Metrics saved to database for pair {data['pair']}.")
     except Exception as e:
         log_error(f"Error saving metrics to database: {e}")
 
-def calculate_moving_average(mid_price):
-    """Calculate the moving average for the mid-price over a fixed window."""
-    mid_prices.append(mid_price)
-    if len(mid_prices) > MOVING_AVERAGE_WINDOW:
-        mid_prices.pop(0)  # Remove oldest mid-price to maintain window size
-    return sum(mid_prices) / len(mid_prices)  # Return the moving average
-
 def calculate_metrics(data, conn):
-    """Calculate highest bid, lowest ask, max spread, mid-price, and moving average, then save to DB."""
-    global highest_bid, lowest_ask, max_spread
+    """Calculate highest bid, lowest ask, max spread, mid-price, and moving average, and save to DB."""
+    global highest_bid, lowest_ask, max_spread, mid_prices
 
     bid = data['bid']
     ask = data['ask']
@@ -92,8 +84,12 @@ def calculate_metrics(data, conn):
     lowest_ask = min(lowest_ask, ask)
     max_spread = max(max_spread, spread)
 
-    # Calculate moving average of mid-price
-    moving_avg = calculate_moving_average(mid_price)
+    # Update mid_prices list and calculate moving average
+    mid_prices.append(mid_price)
+    if len(mid_prices) > window_size:
+        mid_prices.pop(0)  # Keep only the last 'window_size' elements
+
+    moving_avg = sum(mid_prices) / len(mid_prices) if mid_prices else 0
 
     # Prepare data to be saved
     data_to_save = {
@@ -105,7 +101,7 @@ def calculate_metrics(data, conn):
         'highest_bid': highest_bid,
         'lowest_ask': lowest_ask,
         'max_spread': max_spread,
-        'moving_avg': moving_avg  # Include moving average in the data
+        'moving_avg': moving_avg
     }
 
     # Save metrics to database
@@ -121,7 +117,7 @@ def consume_data():
     except Exception as e:
         log_error(f"Database connection failed: {e}")
         exit(1)  # Exit if the database connection fails
-    
+
     while True:
         try:
             message = consumer.poll(1.0)  # Poll every 1 second
