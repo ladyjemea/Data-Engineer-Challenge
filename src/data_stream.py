@@ -2,40 +2,35 @@ from confluent_kafka import Producer
 import json
 import time
 import random
+import logging
 
-# Kafka configuration
+
 KAFKA_TOPIC = 'crypto_prices'
 KAFKA_BOOTSTRAP_SERVERS = 'localhost:9092'
 
-# Initialize Kafka Producer
 producer = Producer({'bootstrap.servers': KAFKA_BOOTSTRAP_SERVERS})
-
-# Currency pairs we want to track
 CURRENCY_PAIRS = ['BTC-USD', 'ETH-USD', 'LTC-USD']
 
 def generate_price_data():
-    """Simulate fetching or generating data similar to Coinbase API order book feeds."""
+    """Simulate fetching or generating data similar to Coinbase API data"""
     data = []
     for pair in CURRENCY_PAIRS:
-        # Generate random prices for bid and ask
         bid_price = round(random.uniform(30000, 60000), 2)
         ask_price = round(bid_price + random.uniform(50, 150), 2)
-        
-        # Simulate additional fields
-        price_level = round(random.uniform(1, 10), 2)  # Price level as an example field
-        quantity = round(random.uniform(0.1, 5), 2)    # Quantity of the order
+        price_level = round(random.uniform(1, 10), 2) 
+        quantity = round(random.uniform(0.1, 5), 2)   
 
-        # Create a data entry
         entry = {
-            "pair": pair,                   # Currency pair (e.g., BTC-USD)
-            "bid": bid_price,               # Bid price for the currency pair
-            "ask": ask_price,               # Ask price for the currency pair
-            "price_level": price_level,     # Simulated price level field
-            "quantity": quantity,           # Simulated quantity field
-            "timestamp": time.time()        # Current timestamp
+            "pair": pair,                   
+            "bid": bid_price,               
+            "ask": ask_price,              
+            "price_level": price_level,     
+            "quantity": quantity,           
+            "timestamp": time.time()        
         }
         
         data.append(entry)
+    logging.info(f"Generated data: {data}")
     return data
 
 def send_data():
@@ -44,9 +39,9 @@ def send_data():
         data = generate_price_data()
         for record in data:
             producer.produce(KAFKA_TOPIC, json.dumps(record).encode('utf-8'))
-            print(f"Sent to Kafka: {record}")  # Log each message sent
+            logging.info(f"Sent to Kafka: {record}")  
         producer.flush()
-        time.sleep(5)  # Send data every 5 seconds to simulate a real-time feed
+        time.sleep(5)  
 
 if __name__ == '__main__':
     print("Starting data stream...")

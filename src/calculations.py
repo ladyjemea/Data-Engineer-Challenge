@@ -5,8 +5,9 @@ import os
 import psycopg2
 from dotenv import load_dotenv
 from src.error_handling import connect_to_database, retry, log_error
+import logging_config
 
-# Load environment variables from .env file
+# Load environment variables
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', force=True)
@@ -19,11 +20,9 @@ DB_CONFIG = {
     'host': os.getenv('DB_HOST')
 }
 
-# Kafka configuration
 KAFKA_TOPIC = 'crypto_prices'
 KAFKA_BOOTSTRAP_SERVERS = 'localhost:9092'
 
-# Initialize Kafka Consumer
 consumer = Consumer({
     'bootstrap.servers': KAFKA_BOOTSTRAP_SERVERS,
     'group.id': 'crypto_price_consumer_group',
@@ -32,7 +31,6 @@ consumer = Consumer({
 
 consumer.subscribe([KAFKA_TOPIC])
 
-# Metrics Tracking Variables
 highest_bid = 0
 lowest_ask = float('inf')
 max_spread = 0
@@ -68,7 +66,7 @@ def calculate_metrics(data, conn):
     """Calculate metrics and save them to the database, handling malformed data."""
     global highest_bid, lowest_ask, max_spread, mid_prices
 
-    # Validate and handle malformed data
+    #Handle malformed data
     try:
         bid = float(data['bid'])
         ask = float(data['ask'])
@@ -92,7 +90,6 @@ def calculate_metrics(data, conn):
 
     moving_avg = sum(mid_prices) / len(mid_prices) if mid_prices else 0
 
-    # Data to save
     data_to_save = {
         'pair': pair,
         'bid': bid,
@@ -111,7 +108,6 @@ def consume_data():
     """Consume data from Kafka, calculate metrics, and store in DB with error handling."""
     logging.info("Starting the consumer and calculations...")
 
-    # Connect to the database with retry logic
     try:
         conn = connect_to_database(DB_CONFIG)
     except Exception as e:
