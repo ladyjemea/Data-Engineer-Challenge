@@ -4,7 +4,7 @@ import logging
 import os
 import psycopg2
 from dotenv import load_dotenv
-from error_handling import connect_to_database, retry, log_error  # Importing from error_handling
+from src.error_handling import connect_to_database, retry, log_error  # Importing from error_handling
 
 # Load environment variables from .env file
 load_dotenv()
