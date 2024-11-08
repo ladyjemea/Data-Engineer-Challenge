@@ -2,7 +2,7 @@
 
 ## General
 1) Data Consistency and Schema:
-- The incoming data from Kafka has a consistent         structure, including fields such as pair, bid, ask, and timestamp.
+- The incoming data from Kafka has a consistent structure, including fields such as pair, bid, ask, and timestamp.
 - All required fields are always present in each message received from Kafka. Missing or malformed data will be handled by logging errors without crashing the program.
 
 2) Currency Pairs:
@@ -12,6 +12,31 @@
 3) Real-Time Data Processing:
 - The system is expected to process data in real-time or near real-time, with a focus on providing up-to-date bid and ask metrics.
 - A polling interval of 1 second for the Kafka consumer is adequate for the needs of this application.
+
+## Data Source
+1) Coinbase API:
+- For a real-world application, we would pull data from Coinbase’s public API for real-time cryptocurrency market data.
+- The API provides fields like `price_level` and `quantity`, which would give additional insights if needed.
+- For this proof-of-concept, we simulate data instead of accessing Coinbase directly.
+
+## Data Structure
+1) Data Entry Format:
+   - Each data entry includes:
+     - `pair`: The currency pair (e.g., BTC-USD).
+     - `bid`: The current bid price.
+     - `ask`: The current ask price.
+     - `timestamp`: The time when the data point was generated.
+
+## Simulated Data
+1) Data Generation:
+   - We generate random bid and ask prices for each currency pair at a 5-second interval.
+   - This simulated data mimics real-time market data for testing the calculation and ingestion pipeline.
+
+## Calculations
+1) Metrics Tracked:
+   - Highest Bid and Lowest Ask: Updated with each data point.
+   - Max Spread: The largest spread between `ask` and `bid` prices over time.
+   - Mid-Price Moving Average: Calculated as a simple moving average of the last 5 mid-prices.
 
 ## Kafka
 1) Kafka Server:
@@ -47,7 +72,7 @@
 ## Error Handling
 1) Retry Logic:
 - A retry mechanism is implemented for database connections and inserts, assuming that transient errors will resolve within a few retry attempts.
-- n the event of an unrecoverable error (e.g., database is down for an extended period), errors are logged, and the program exits gracefully.
+- In the event of an unrecoverable error (e.g., database is down for an extended period), errors are logged, and the program exits gracefully.
 
 2) Logging:
 - The logging configuration is sufficient to capture error messages, warnings, and informational messages related to data processing and storage.

@@ -11,6 +11,7 @@ producer = Producer({'bootstrap.servers': KAFKA_BOOTSTRAP_SERVERS})
 CURRENCY_PAIRS = ['BTC-USD', 'ETH-USD', 'LTC-USD']
 
 def generate_price_data():
+    """Generate simulated bid and ask prices for cryptocurrency pairs."""
     data = []
     for pair in CURRENCY_PAIRS:
         bid_price = round(random.uniform(30000, 60000), 2)
@@ -24,6 +25,7 @@ def generate_price_data():
     return data
 
 def send_data():
+    """Continuously send generated data to Kafka."""
     while True:
         data = generate_price_data()
         for record in data:

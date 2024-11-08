@@ -4,13 +4,13 @@ import logging
 import os
 import psycopg2
 from dotenv import load_dotenv
-from src.error_handling import connect_to_database, retry, log_error  # Importing from error_handling
+from collections import deque
+from src.error_handling import connect_to_database, retry, log_error
 
 # Load environment variables from .env file
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', force=True)
-
 
 # Database configuration
 DB_CONFIG = {
@@ -26,8 +26,7 @@ KAFKA_BOOTSTRAP_SERVERS = 'localhost:9092'
 
 # Initialize Kafka Consumer
 consumer = Consumer({
-    #'bootstrap.servers': KAFKA_BOOTSTRAP_SERVERS,
-    'bootstrap.servers': 'localhost:9092',
+    'bootstrap.servers': KAFKA_BOOTSTRAP_SERVERS,
     'group.id': 'crypto_price_consumer_group',
     'auto.offset.reset': 'earliest'
 })
@@ -38,15 +37,9 @@ consumer.subscribe([KAFKA_TOPIC])
 highest_bid = 0
 lowest_ask = float('inf')
 max_spread = 0
+mid_price_history = deque(maxlen=5)  # For moving average
 
-@retry  # Applying retry decorator for database connection
-def connect_to_database():
-    """Establish a connection to the PostgreSQL database with retries."""
-    conn = psycopg2.connect(**DB_CONFIG)
-    conn.autocommit = True
-    return conn
-
-@retry  # Applying retry decorator for database insertion
+@retry
 def save_metrics_to_db(data, conn):
     """Save calculated metrics to the PostgreSQL database."""
     try:
@@ -71,7 +64,7 @@ def save_metrics_to_db(data, conn):
         log_error(f"Error saving metrics to database: {e}")
 
 def calculate_metrics(data, conn):
-    """Calculate highest bid, lowest ask, max spread, and mid-price, and save to DB."""
+    """Calculate metrics, including a moving average of the mid-price, and save to DB."""
     global highest_bid, lowest_ask, max_spread
 
     bid = data['bid']
@@ -84,7 +77,10 @@ def calculate_metrics(data, conn):
     lowest_ask = min(lowest_ask, ask)
     max_spread = max(max_spread, spread)
 
-    # Prepare data to be saved
+    # Update mid_price moving average
+    mid_price_history.append(mid_price)
+    moving_avg_mid_price = sum(mid_price_history) / len(mid_price_history)
+
     data_to_save = {
         'pair': data['pair'],
         'bid': bid,
@@ -96,7 +92,6 @@ def calculate_metrics(data, conn):
         'max_spread': max_spread
     }
 
-    # Save metrics to database
     save_metrics_to_db(data_to_save, conn)
 
 def consume_data():
@@ -105,12 +100,11 @@ def consume_data():
 
     # Connect to the database with retry logic
     try:
-        conn = connect_to_database()
+        conn = connect_to_database(DB_CONFIG)
     except Exception as e:
         log_error(f"Database connection failed: {e}")
         exit(1)  # Exit if the database connection fails
     
-
     while True:
         try:
             message = consumer.poll(1.0)  # Poll every 1 second
