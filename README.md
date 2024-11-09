@@ -25,11 +25,13 @@ The project consists of the following components:
 2) Kafka Stream: Serves as a message broker, facilitating the data stream from the ingestion layer to the processing layer.
 3) Processing Layer: Consumes data from Kafka, calculates metrics, and stores the results in a PostgreSQL database.
 4) Database Storage: Stores calculated metrics in PostgreSQL for easy retrieval and analysis.
+5) Visualization Layer: Generates plots for key metrics to assist with data-driven decisions.
 
-The high-level data flow:
+### The high-level data flow:
 1) data_stream.py generates simulated data for cryptocurrency pairs and publishes it to a Kafka topic.
 2) calculations.py consumes the Kafka data, calculates metrics, and saves results to PostgreSQL.
 3) data_processing.py provides a foundation for future expansions, such as windowing-based aggregations using Apache Beam.
+4) Data Visualization: visualization.py retrieves historical metrics from the database and generates time-series plots for visual insights.
 
 ## Setup and Installation
 Prerequisites
@@ -83,22 +85,33 @@ Installation
     - This script consumes data from Kafka, calculates metrics, and saves them to PostgreSQL.
     python src/calculations.py
 
+4) Run Visualization
+    - This script generates time-series plots of key metrics from the database.
+    python src/visualization.py
+
+
 ## Project Structure
 Data-Engineer-Challenge/
-├── src/
-│   ├── data_stream.py       # Simulates data ingestion and publishes to Kafka
-│   ├── calculations.py      # Consumes Kafka messages, processes data, and saves to DB
-│   ├── data_processing.py   # Future extension for windowing and aggregation
-├── docs/
-│   ├── assumptions.md       # Documented assumptions for the project
-│   ├── architecture_diagram.png # Architecture diagram
-│   ├── design_decisions.md  # Documented design decisions
-├── tests/
-│   ├── test_data_stream.py  # Tests for data_stream
-│   ├── test_calculations.py # Tests for calculations
-├── requirements.txt         # Python package dependencies
-├── README.md                # Project documentation
-└── .env.example             # Example environment variables file
+├── src/                        
+│   ├── data_stream.py         
+│   ├── calculations.py         
+│   ├── error_handling.py       
+│   ├── visualization.py        
+│   └── config.py               
+├── tests/                      
+│   ├── test_data_stream.py     
+│   ├── test_calculations.py    
+│   ├── test_visualization.py   
+│   └── test_error_handling.py  
+├── docs/                       
+│   ├── assumptions.md          
+│   ├── architecture.md         
+│   ├── design_decisions.md     
+│   └── architecture_diagram.png 
+├── requirements.txt            
+├── README.md                   
+└── .env                        
+
 
 ## Testing
 Unit tests are included for the main components (data_stream.py and calculations.py). To run tests, execute the following command:
@@ -108,13 +121,21 @@ The tests include:
 - Calculations Tests: Test that metrics are calculated accurately and database insertion is performed as expected.
 
 ## Assumptions
-This project makes several assumptions, such as a consistent data schema, available Kafka topic, and specific PostgreSQL table structure. For a detailed list of assumptions, see assumptions.md.
+- A consistent data schema for cryptocurrency data.
+- A pre-configured Kafka topic crypto_prices.
+- A PostgreSQL table structure as outlined in the crypto_metrics table setup.
+- A local development setup with Kafka and PostgreSQL accessible without complex network configurations.
+See assumptions.md for a detailed list of assumptions.
 
 ## Design Decisions
-The design decisions for this project were made to balance real-time data processing, system reliability, and modularity. For a complete overview, refer to design_decisions.md.
+The design of this project prioritizes:
+- Real-time data processing: Using Kafka and Apache Beam for streaming and scalable data handling.
+- Error handling and retries: Built-in retry mechanisms for handling transient errors.
+- Modularity and extensibility: Separate scripts for data ingestion, processing, error handling, and visualization.
+See design_decisions.md for a comprehensive overview.
 
 ## Future Improvements
 - Enhanced Error Handling: Add more robust error handling and alerting mechanisms.
 - Scalability: Use consumer groups to distribute data processing across multiple instances.
 - Windowed Aggregations: Implement windowing in data_processing.py to support time-based aggregations.
-- Data Visualization: Integrate with BI tools (e.g., Grafana or Tableau) for real-time data visualization.
+- Advanced Visualization: Integrate with BI tools like Grafana or Tableau for dynamic, real-time data visualization.
