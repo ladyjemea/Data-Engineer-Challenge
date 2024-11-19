@@ -1,10 +1,19 @@
+import sys
+from pathlib import Path
+
+# Add the project root directory to sys.path
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+
+
 from confluent_kafka import Consumer, KafkaError
 import json
 import logging
+import logging_config
 import os
 import psycopg2
 from dotenv import load_dotenv
 from src.error_handling import connect_to_database, retry, log_error
+from src.error_handling import log_error, retry
 import logging_config
 
 # Load environment variables
