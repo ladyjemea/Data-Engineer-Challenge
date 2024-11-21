@@ -1,60 +1,90 @@
 import unittest
 from unittest.mock import patch, MagicMock
-from src.visualization import plot_metrics, get_data_from_db
+import pandas as pd
+import matplotlib.pyplot as plt
+from src.visualization import fetch_data_from_db, plot_time_series, plot_heatmap, plot_polar_chart
+
 
 class TestVisualization(unittest.TestCase):
 
-    @patch('src.visualization.get_data_from_db')
-    @patch('src.visualization.plt.show')
-    @patch('src.visualization.plt.plot')
-    def test_plot_metrics(self, mock_plot, mock_show, mock_get_data_from_db):
+    def setUp(self):
         """
-        Test that plot_metrics retrieves data from PostgreSQL and attempts to plot it.
+        Set up mock data for testing visualizations.
         """
-        # Mock data to simulate database output
-        mock_data = [
-            {'pair': 'BTC-USD', 'timestamp': '2024-01-01 12:00:00', 'mid_price': 50050.0},
-            {'pair': 'ETH-USD', 'timestamp': '2024-01-01 12:05:00', 'mid_price': 2000.0},
-        ]
-        mock_get_data_from_db.return_value = mock_data
-
-        # Call the plot_metrics function
-        plot_metrics(mock_data)
-
-        # Assert that the plotting functions were called
-        mock_plot.assert_called()
-        mock_show.assert_called_once()
+        self.mock_data = pd.DataFrame({
+            'timestamp': ['2023-11-20 10:00:00', '2023-11-20 10:05:00', '2023-11-20 10:10:00'],
+            'pair': ['BTC-USD', 'ETH-USD', 'BTC-USD'],
+            'bid': [50000, 1800, 51000],
+            'ask': [50200, 1850, 51500],
+            'spread': [200, 50, 500],
+            'mid_price': [50100, 1825, 51250]
+        })
+        self.mock_data['timestamp'] = pd.to_datetime(self.mock_data['timestamp'])
 
     @patch('src.visualization.psycopg2.connect')
-    def test_get_data_from_db(self, mock_connect):
+    def test_fetch_data_from_db(self, mock_connect):
         """
-        Test that get_data_from_db retrieves data from PostgreSQL.
+        Test that data is fetched from the database and returned as a DataFrame.
         """
-        # Mock database connection and cursor
         mock_conn = MagicMock()
-        mock_cursor = MagicMock()
         mock_connect.return_value = mock_conn
-        mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
 
-        # Define fake data to return from the cursor
+        # Simulate query execution and result fetching
+        mock_cursor = mock_conn.cursor.return_value.__enter__.return_value
         mock_cursor.fetchall.return_value = [
-            ('BTC-USD', '2024-01-01 12:00:00', 50050.0),
-            ('ETH-USD', '2024-01-01 12:05:00', 2000.0),
+            ('2023-11-20 10:00:00', 'BTC-USD', 50000, 50200, 200, 50100),
+            ('2023-11-20 10:05:00', 'ETH-USD', 1800, 1850, 50, 1825)
+        ]
+        mock_cursor.description = [
+            ('timestamp',), ('pair',), ('bid',), ('ask',), ('spread',), ('mid_price',)
         ]
 
-        # Call get_data_from_db
-        result = get_data_from_db()
+        df = fetch_data_from_db()
 
-        # Assert the result is correct
-        self.assertEqual(len(result), 2)
-        self.assertEqual(result[0]['pair'], 'BTC-USD')
-        self.assertEqual(result[0]['mid_price'], 50050.0)
-        self.assertEqual(result[1]['pair'], 'ETH-USD')
-        self.assertEqual(result[1]['mid_price'], 2000.0)
+        # Verify the DataFrame is correctly fetched and structured
+        self.assertIsInstance(df, pd.DataFrame)
+        self.assertEqual(len(df), 2)
+        self.assertListEqual(list(df.columns), ['timestamp', 'pair', 'bid', 'ask', 'spread', 'mid_price'])
 
-        # Assert the database connection and query were executed
-        mock_connect.assert_called_once()
-        mock_cursor.execute.assert_called_once_with("SELECT pair, timestamp, mid_price FROM crypto_metrics")
+    @patch('matplotlib.pyplot.show')
+    def test_plot_time_series(self, mock_show):
+        """
+        Test the time series plot function to ensure it runs without errors.
+        """
+        try:
+            plot_time_series(self.mock_data)
+        except Exception as e:
+            self.fail(f"plot_time_series raised an exception: {e}")
+
+        # Verify that plt.show() was called
+        mock_show.assert_called_once()
+
+    @patch('matplotlib.pyplot.show')
+    def test_plot_heatmap(self, mock_show):
+        """
+        Test the heatmap plot function to ensure it runs without errors.
+        """
+        try:
+            plot_heatmap(self.mock_data)
+        except Exception as e:
+            self.fail(f"plot_heatmap raised an exception: {e}")
+
+        # Verify that plt.show() was called
+        mock_show.assert_called_once()
+
+    @patch('matplotlib.pyplot.show')
+    def test_plot_polar_chart(self, mock_show):
+        """
+        Test the polar chart plot function to ensure it runs without errors.
+        """
+        try:
+            plot_polar_chart(self.mock_data)
+        except Exception as e:
+            self.fail(f"plot_polar_chart raised an exception: {e}")
+
+        # Verify that plt.show() was called
+        mock_show.assert_called_once()
+
 
 if __name__ == '__main__':
     unittest.main()

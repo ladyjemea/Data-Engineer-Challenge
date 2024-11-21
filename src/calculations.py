@@ -1,24 +1,22 @@
 import sys
 from pathlib import Path
-
-# Add the project root directory to sys.path
-sys.path.append(str(Path(__file__).resolve().parent.parent))
-
-
 from confluent_kafka import Consumer, KafkaError
 import json
 import logging
-import logging_config
 import os
 import psycopg2
 from dotenv import load_dotenv
+
+# Add the project root directory to sys.path
+project_root = Path(__file__).resolve().parent.parent
+sys.path.append(str(project_root))
+
 from src.error_handling import connect_to_database, retry, log_error
-from src.error_handling import log_error, retry
-import logging_config
 
 # Load environment variables
 load_dotenv()
 
+# Logging configuration
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', force=True)
 
 # Database configuration
@@ -40,15 +38,16 @@ consumer = Consumer({
 
 consumer.subscribe([KAFKA_TOPIC])
 
+# Global metrics
 highest_bid = 0
 lowest_ask = float('inf')
 max_spread = 0
 window_size = 5  
-mid_prices = [] 
+mid_prices = []
 
 @retry
-def save_metrics_to_db(data, conn):
-    """Save calculated metrics to the PostgreSQL database with retries."""
+def save_metrics_to_db(data: dict, conn):
+    """Save calculated metrics to the PostgreSQL database."""
     try:
         with conn.cursor() as cur:
             query = """
@@ -71,35 +70,48 @@ def save_metrics_to_db(data, conn):
     except Exception as e:
         log_error(f"Error saving metrics to database: {e}")
 
-def calculate_metrics(data, conn):
-    """Calculate metrics and save them to the database, handling malformed data."""
-    global highest_bid, lowest_ask, max_spread, mid_prices
-
-    #Handle malformed data
+def validate_and_extract_data(data: dict) -> dict:
+    """Validate and extract required fields from incoming data."""
     try:
-        bid = float(data['bid'])
-        ask = float(data['ask'])
-        pair = data['pair']
+        return {
+            'pair': data['pair'],
+            'bid': float(data['bid']),
+            'ask': float(data['ask'])
+        }
     except (ValueError, KeyError) as e:
         log_error(f"Malformed data: {data}. Error: {e}")
-        return
+        return None
 
-    mid_price = (bid + ask) / 2
-    spread = ask - bid
+def calculate_mid_price(bid: float, ask: float) -> float:
+    """Calculate the mid-price."""
+    return (bid + ask) / 2
 
-    # Update cumulative metrics
+def calculate_spread(bid: float, ask: float) -> float:
+    """Calculate the spread."""
+    return ask - bid
+
+def update_cumulative_metrics(bid: float, ask: float):
+    """Update highest bid, lowest ask, and max spread."""
+    global highest_bid, lowest_ask, max_spread
     highest_bid = max(highest_bid, bid)
     lowest_ask = min(lowest_ask, ask)
-    max_spread = max(max_spread, spread)
+    max_spread = max(max_spread, calculate_spread(bid, ask))
 
-    # Update moving average
+def calculate_moving_average(mid_price: float) -> float:
+    """Update and calculate the moving average of mid prices."""
+    global mid_prices
     mid_prices.append(mid_price)
     if len(mid_prices) > window_size:
         mid_prices.pop(0)
+    return sum(mid_prices) / len(mid_prices) if mid_prices else 0
 
-    moving_avg = sum(mid_prices) / len(mid_prices) if mid_prices else 0
-
-    data_to_save = {
+def prepare_data_for_db(pair: str, bid: float, ask: float) -> dict:
+    """Prepare a dictionary of metrics for database insertion."""
+    mid_price = calculate_mid_price(bid, ask)
+    spread = calculate_spread(bid, ask)
+    update_cumulative_metrics(bid, ask)
+    moving_avg = calculate_moving_average(mid_price)
+    return {
         'pair': pair,
         'bid': bid,
         'ask': ask,
@@ -111,10 +123,21 @@ def calculate_metrics(data, conn):
         'moving_avg': moving_avg
     }
 
-    save_metrics_to_db(data_to_save, conn)
+def process_message(data: dict, conn):
+    """Process a single message by validating, calculating metrics, and saving to the database."""
+    validated_data = validate_and_extract_data(data)
+    if not validated_data:
+        return
+
+    db_data = prepare_data_for_db(
+        validated_data['pair'],
+        validated_data['bid'],
+        validated_data['ask']
+    )
+    save_metrics_to_db(db_data, conn)
 
 def consume_data():
-    """Consume data from Kafka, calculate metrics, and store in DB with error handling."""
+    """Consume data from Kafka, process it, and save metrics to the database."""
     logging.info("Starting the consumer and calculations...")
 
     try:
@@ -126,7 +149,6 @@ def consume_data():
     while True:
         try:
             message = consumer.poll(1.0)
-
             if message is None:
                 continue
             if message.error():
@@ -138,7 +160,7 @@ def consume_data():
 
             data = json.loads(message.value().decode('utf-8'))
             logging.info(f"Received message: {data}")
-            calculate_metrics(data, conn)
+            process_message(data, conn)
 
         except Exception as e:
             log_error(f"Error during data consumption: {e}")
