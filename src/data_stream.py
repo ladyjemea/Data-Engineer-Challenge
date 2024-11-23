@@ -75,3 +75,5 @@ def send_data(iterations: int = None, interval: int = 5):
 if __name__ == '__main__':
     logging.info("Starting data stream...")
     send_data()
+
+#add a comment
