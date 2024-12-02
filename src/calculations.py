@@ -174,5 +174,3 @@ if __name__ == '__main__':
         logging.info("Consumer interrupted.")
     finally:
         consumer.close()
-
-#This is a comment on the calculations script
