@@ -1,4 +1,4 @@
-# Data-Engineer-Challenge
+# Real-Time Data Pipeline
 This repository contains a solution for a real-time data processing pipeline designed to ingest cryptocurrency market data from Coinbase, perform calculations, and store insights for further analysis. The project simulates real-time market data ingestion using Apache Kafka and processes the data to track key metrics such as bid, ask, spread, and mid-price.
 
 ## Table of Contents
